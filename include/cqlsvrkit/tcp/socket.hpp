@@ -4,20 +4,26 @@
 
 #pragma once
 
+#include <iostream>
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
+#include <boost/optional.hpp>
+
+#include "detail/byte.hpp"
+#include "detail/data_convert.hpp"
 
 namespace cqlsvrkit {
 namespace tcp {
-
-enum class byte : std::uint8_t {};
 
 class Socket {
  public:
   using Bytes = std::vector<byte>;
   template <class DataType>
-  using OnReadDataCallback = std::function<void(const DataType&)>;
+  using OnReadDataCallback = std::function<void(boost::optional<DataType>)>;
   using OnReadBytesCallback = OnReadDataCallback<Bytes>;
+
+  using OnWriteCallback = std::function<void(bool)>;
 
  private:
   std::unique_ptr<boost::asio::ip::tcp::socket> socket_;
@@ -49,11 +55,22 @@ class Socket {
     return socket_;
   }
 
- private:
+ private:  // read
   template <class DataType>
   void onRead(OnReadDataCallback<DataType> callback,
-              const boost::system::error_code& error,
-              size_t bytes_transferred) {}
+              const boost::system::error_code& ec,
+              std::size_t bytes_transferred) {
+    boost::optional<DataType> data;
+    if (ec) {
+      std::cerr << "read error: " << ec.message() << std::endl;
+    } else {
+      const byte* bytes = boost::asio::buffer_cast<const byte*>(buffer_.data());
+      data = detail::CreateDataFromBytes<DataType>(bytes, bytes_transferred);
+      buffer_.consume(bytes_transferred);
+    }
+
+    callback(data);
+  }
 
  private:
   template <class DataType>
@@ -68,11 +85,29 @@ class Socket {
  public:
   template <class DataType>
   void read(OnReadDataCallback<DataType> callback) {
+    static_assert(std::is_trivially_copyable<DataType>::value,
+                  "read data type must be trivially copyable");
     readImpl<DataType>(sizeof(DataType), std::move(callback));
   }
 
   void read(std::size_t length, OnReadBytesCallback callback) {
     readImpl<Bytes>(length, std::move(callback));
+  }
+
+ private:  // write
+  void onWrite(OnWriteCallback callback, const boost::system::error_code& ec,
+               std::size_t bytes_transferred) {
+    callback(!ec);
+  }
+
+ public:
+  template <class DataType>
+  void write(const DataType& data, OnWriteCallback callback) {
+    boost::asio::async_write(
+        *socket_, boost::asio::buffer(data),
+        boost::bind(&Socket::onWrite, this, std::move(callback),
+                    boost::asio::placeholders::error,
+                    boost::asio::placeholders::bytes_transferred));
   }
 };
 

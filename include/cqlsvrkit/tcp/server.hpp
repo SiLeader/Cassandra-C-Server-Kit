@@ -16,7 +16,7 @@ namespace tcp {
 
 class TcpServer {
  private:
-  boost::asio::io_context ioc_;
+  boost::asio::io_service ioc_;
   boost::asio::ip::tcp::acceptor acceptor_;
 
   std::function<void(std::shared_ptr<Socket>)> on_accept_callback_;
