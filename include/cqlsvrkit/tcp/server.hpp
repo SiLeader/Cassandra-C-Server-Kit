@@ -4,10 +4,11 @@
 
 #pragma once
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
 #include <functional>
 #include <iostream>
+
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
 
 #include "socket.hpp"
 
@@ -16,16 +17,16 @@ namespace tcp {
 
 class TcpServer {
  private:
-  boost::asio::io_service ioc_;
+  boost::asio::io_service& ioc_;
   boost::asio::ip::tcp::acceptor acceptor_;
 
   std::function<void(std::shared_ptr<Socket>)> on_accept_callback_;
 
  public:
-  explicit TcpServer(std::uint16_t port)
-      : ioc_(),
-        acceptor_(ioc_, boost::asio::ip::tcp::endpoint(
-                            boost::asio::ip::tcp::v4(), port)) {}
+  explicit TcpServer(boost::asio::io_service& ioc, std::uint16_t port)
+      : ioc_(ioc),
+        acceptor_(ioc, boost::asio::ip::tcp::endpoint(
+                           boost::asio::ip::tcp::v4(), port)) {}
 
   TcpServer(const TcpServer&) = delete;
   TcpServer(TcpServer&&) = delete;
@@ -62,6 +63,9 @@ class TcpServer {
     on_accept_callback_ = std::forward<CallbackF>(callback);
     listenImpl();
   }
+
+ public:
+  void run() { ioc_.run(); }
 };
 
 }  // namespace tcp

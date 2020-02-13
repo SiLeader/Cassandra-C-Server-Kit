@@ -3,3 +3,5 @@
 //
 
 #pragma once
+
+#include "rpc_base.hpp"

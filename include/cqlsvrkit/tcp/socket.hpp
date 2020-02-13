@@ -109,6 +109,11 @@ class Socket {
                     boost::asio::placeholders::error,
                     boost::asio::placeholders::bytes_transferred));
   }
+
+ public:
+  void close() { socket_->close(); }
+
+  std::uint16_t localPort() const { return socket_->local_endpoint().port(); }
 };
 
 }  // namespace tcp
