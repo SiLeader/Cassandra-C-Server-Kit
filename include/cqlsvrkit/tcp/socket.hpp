@@ -75,7 +75,7 @@ class Socket {
  private:
   template <class DataType>
   void readImpl(std::size_t length, OnReadDataCallback<DataType> callback) {
-    boost::asio::async_read_until(
+    boost::asio::async_read(
         *socket_, buffer_, boost::asio::transfer_exactly(length),
         boost::bind(&Socket::onRead<DataType>, this, callback,
                     boost::asio::placeholders::error,
@@ -96,7 +96,10 @@ class Socket {
 
  private:  // write
   void onWrite(OnWriteCallback callback, const boost::system::error_code& ec,
-               std::size_t bytes_transferred) {
+               std::size_t) {
+    if (ec) {
+      std::cerr << "read error: " << ec.message() << std::endl;
+    }
     callback(!ec);
   }
 
@@ -114,6 +117,7 @@ class Socket {
   void close() { socket_->close(); }
 
   std::uint16_t localPort() const { return socket_->local_endpoint().port(); }
+  std::uint16_t remotePort() const { return socket_->remote_endpoint().port(); }
 };
 
 }  // namespace tcp

@@ -4,17 +4,42 @@
 
 #pragma once
 
+#include <map>
 #include <unordered_map>
 
 #include <endian.h>
 
+#include "../error.hpp"
 #include "../types.hpp"
 
 namespace cqlsvrkit {
 namespace convert {
-std::uint16_t hostToNetwork(std::uint16_t n) { return htobe16(n); }
-std::uint32_t hostToNetwork(std::uint32_t n) { return htobe32(n); }
-std::uint64_t hostToNetwork(std::uint64_t n) { return htobe64(n); }
+namespace detail {
+
+inline void convert_assert(bool expression, const char* message) {
+  if (!expression) {
+    throw error::ProtocolError(message);
+  }
+}
+
+template <class Iterator, class Category>
+using enable_if_category_t = std::enable_if_t<std::is_same<
+    Category,
+    typename std::iterator_traits<Iterator>::iterator_category>::value>;
+
+}  // namespace detail
+
+inline std::uint16_t hostToNetwork(std::uint16_t n) { return htobe16(n); }
+inline std::uint32_t hostToNetwork(std::uint32_t n) { return htobe32(n); }
+inline std::uint64_t hostToNetwork(std::uint64_t n) { return htobe64(n); }
+inline std::int16_t hostToNetwork(std::int16_t n) { return htobe16(n); }
+inline std::int32_t hostToNetwork(std::int32_t n) { return htobe32(n); }
+inline std::int64_t hostToNetwork(std::int64_t n) { return htobe64(n); }
+
+template <class Integral>
+Integral networkToHost(Integral n) {
+  return hostToNetwork(n);
+}
 
 template <class Integral,
           class = std::enable_if_t<std::is_integral<Integral>::value>>
@@ -34,19 +59,9 @@ auto toBytes(const BytesConvertiblePointer& data) -> decltype(data->toBytes()) {
   return data->toBytes();
 }
 
-inline std::vector<byte> toBytes(const std::string& data) {
-  auto bytes = toBytes(static_cast<std::uint16_t>(data.size()));
-  bytes.insert(std::end(bytes), std::begin(data), std::end(data));
+std::vector<byte> toBytes(const std::string& data);
 
-  return bytes;
-}
-
-inline std::vector<byte> toBytes(const boost::string_view& data) {
-  auto bytes = toBytes(static_cast<std::uint16_t>(data.size()));
-  bytes.insert(std::end(bytes), std::begin(data), std::end(data));
-
-  return bytes;
-}
+std::vector<byte> toBytes(const boost::string_view& data);
 
 template <class T>
 std::vector<byte> toBytes(const std::vector<T>& list) {
@@ -75,12 +90,62 @@ std::vector<byte> toBytes(
   return bytes;
 }
 
-std::unordered_map<boost::string_view, boost::string_view> toStringMap(
-    const std::vector<byte>& bytes);
+template <class Integral,
+          class = std::enable_if_t<std::is_integral<Integral>::value>>
+Integral toInteger(const std::vector<byte>& data,
+                   std::size_t* offset = nullptr) {
+  auto offset_value = offset == nullptr ? 0 : *offset;
+  detail::convert_assert(data.size() >= offset_value,
+                         "invalid request body length");
 
-boost::string_view toLongString(const std::vector<byte>& bytes);
+  if (offset) {
+    *offset += sizeof(Integral);
+  }
 
-cpp17::span<byte> toShortBytes(const std::vector<byte>& bytes);
+  return networkToHost(
+      *reinterpret_cast<const Integral*>(data.data() + offset_value));
+}
+
+template <class Ret, class Length>
+Ret toSequentialDataImpl(const std::vector<byte>& data,
+                         std::size_t* offset = nullptr) {
+  auto offset_value = offset == nullptr ? 0 : *offset;
+  detail::convert_assert(data.size() >= offset_value,
+                         "invalid request body length");
+
+  auto length =
+      static_cast<std::size_t>(toInteger<Length>(data, &offset_value));
+  if (offset) {
+    *offset = offset_value + length;
+  }
+
+  return Ret{
+      reinterpret_cast<typename Ret::const_pointer>(data.data() + offset_value),
+      length};
+}
+
+boost::string_view toString(const std::vector<byte>& data,
+                            std::size_t* offset = nullptr);
+
+boost::string_view toLongString(const std::vector<byte>& data,
+                                std::size_t* offset = nullptr);
+
+std::map<boost::string_view, boost::string_view> toStringMap(
+    const std::vector<byte>& data, std::size_t* offset = nullptr);
+
+cpp17::span<byte> toShortBytes(const std::vector<byte>& data,
+                               std::size_t* offset = nullptr);
+
+cpp17::span<byte> toBytes(const std::vector<byte>& data,
+                          std::size_t* offset = nullptr);
+
+std::vector<boost::string_view> toStringList(const std::vector<byte>& data,
+                                             std::size_t* offset = nullptr);
+
+template <class T>
+T toData(const std::vector<byte>& data, std::size_t* offset = nullptr) {
+  return T::Make(data, offset);
+}
 
 }  // namespace convert
 }  // namespace cqlsvrkit

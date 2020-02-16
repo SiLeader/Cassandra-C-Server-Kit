@@ -52,9 +52,11 @@ class TcpServer {
   void listenImpl() {
     auto socket = std::make_unique<boost::asio::ip::tcp::socket>(ioc_);
     auto socket_ptr = socket.get();
-    acceptor_.async_accept(
-        *socket_ptr, boost::bind(&TcpServer::onAccept, this, std::move(socket),
-                                 boost::asio::placeholders::error));
+    acceptor_.async_accept(*socket_ptr,
+                           [this, sock = std::move(socket)](
+                               const boost::system::error_code& ec) mutable {
+                             onAccept(std::move(sock), ec);
+                           });
   }
 
  public:

@@ -5,18 +5,17 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
+#include <boost/optional.hpp>
 #include <boost/utility/string_view.hpp>
 #include <cpp17/span.hpp>
 
+#include "../tcp/detail/byte.hpp"
+
 namespace cqlsvrkit {
 
-namespace common_types {
-
-using Int = std::int32_t;
-using Long = std::int64_t;
-using Byte = std::uint8_t;
-using Short = std::uint16_t;
+using tcp::byte;
 
 struct Uuid {
   std::uint64_t data1, data2;
@@ -27,13 +26,4 @@ struct Uuid {
   bool operator!=(const Uuid& rhs) const noexcept { return !((*this) == rhs); }
 };
 
-template <class T>
-using List = cpp17::span<T>;
-using String = boost::string_view;
-using LongString = String;
-using StringList = List<String>;
-using Bytes = List<Byte>;
-using ShortBytes = Bytes;
-
-}  // namespace common_types
 }  // namespace cqlsvrkit

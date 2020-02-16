@@ -9,7 +9,7 @@
 namespace cqlsvrkit {
 namespace error {
 
-enum class ErrorCode : common_types::Short {
+enum class ErrorCode : std::int16_t {
   kServerError = 0x0000,
   kProtocolError = 0x000a,
   kAuthenticationError = 0x0100,
